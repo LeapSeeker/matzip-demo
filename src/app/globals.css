@@ -1,26 +1,34 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root{
+  --bg: #fbfbfe;
+  --text: #111827;      /* slate-900 */
+  --muted: #6b7280;     /* gray-500 */
+  --card: rgba(255,255,255,.72);
+  --card2: rgba(255,255,255,.92);
+  --border: rgba(17,24,39,.08);
+  --shadow: 0 18px 50px rgba(15, 23, 42, .10);
+  --shadow2: 0 10px 30px rgba(15, 23, 42, .08);
+
+  /* 은은한 포인트(파스텔) */
+  --a1: rgba(168, 85, 247, .14);  /* violet */
+  --a2: rgba(59, 130, 246, .12);  /* blue */
+  --a3: rgba(16, 185, 129, .10);  /* emerald */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+body{
+  color: var(--text);
+  background:
+    radial-gradient(900px 520px at 12% 8%, var(--a1), transparent 60%),
+    radial-gradient(760px 520px at 86% 12%, var(--a2), transparent 60%),
+    radial-gradient(820px 560px at 55% 92%, var(--a3), transparent 62%),
+    linear-gradient(180deg, var(--bg), #ffffff);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* 라이트 글래스 카드: “블러 과함” 방지 */
+.glass{
+  background: linear-gradient(180deg, var(--card), var(--card2));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow2);
+  backdrop-filter: blur(8px);
 }
