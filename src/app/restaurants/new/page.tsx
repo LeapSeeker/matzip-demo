@@ -8,12 +8,16 @@ const FALLBACK_IMG =
   "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1600&q=60";
 
 // @lat,lng 파싱 (있으면 정확 핀, 없으면 null)
-function extractLatLng(mapUrl: string): { lat: number | null; lng: number | null } {
+function extractLatLng(mapUrl: string): {
+  lat: number | null;
+  lng: number | null;
+} {
   const m = mapUrl.match(/@(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
   if (!m) return { lat: null, lng: null };
   const lat = Number(m[1]);
   const lng = Number(m[3]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { lat: null, lng: null };
+  if (!Number.isFinite(lat) || !Number.isFinite(lng))
+    return { lat: null, lng: null };
   return { lat, lng };
 }
 
@@ -42,25 +46,40 @@ function normalizeUrls(text: string) {
   return Array.from(new Set(parts));
 }
 
+const SAMPLE = {
+  name: "고고치킨",
+  address: "Tokyo, Asakusa",
+  category: "한국식 치킨",
+  description: "바삭한 튀김옷과 한국식 양념이 인기",
+  thumbnailUrl:
+    "https://tblg.k-img.com/restaurant/images/Rvw/233671/640x640_rect_caab78d6b2c12f297dc0f84a0675a790.jpg",
+  mapUrl:
+    "https://www.google.com/maps/place/%EC%95%84%EC%82%AC%EC%BF%A0%EC%82%AC+%EA%B3%A0%EA%B3%A0%EC%B9%98%ED%82%A8/@35.714765,139.796655,17z",
+  mainMenu: "양념치킨, 간장치킨",
+  features: "현지인에게도 인기, 포장 가능",
+  phone: "+81-3-0000-0000",
+  galleryText: `https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=60
+https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1200&q=60`,
+};
+
 export default function Page() {
   const router = useRouter();
 
   // 필수
-  const [name, setName] = useState("맛집이름123");
-  const [address, setAddress] = useState("Tokyo, test");
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
 
   // 옵션
-  const [category, setCategory] = useState("카테고리123");
-  const [description, setDescription] = useState("설명123");
+  const [category, setCategory] = useState("");
+  const [description, setDescription] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
-  const [mapUrl, setMapUrl] = useState("https://www.google.com/maps/place/%EB%8F%84%EC%BF%84/@35.6813039,139.7644909,17z/data=!3m1!4b1!4m6!3m5!1s0x60188bfbd89f700b:0x277c49ba34ed38!8m2!3d35.6812996!4d139.7670658!16zL20vMDFfdnY3?entry=ttu&g_ep=EgoyMDI2MDIxOC4wIKXMDSoASAFQAw%3D%3D");
-  const [mainMenu, setMainMenu] = useState("메인메뉴123");
-  const [features, setFeatures] = useState("특징123");
-  const [phone, setPhone] = useState("010-1234-5678");
+  const [mapUrl, setMapUrl] = useState("");
+  const [mainMenu, setMainMenu] = useState("");
+  const [features, setFeatures] = useState("");
+  const [phone, setPhone] = useState("");
 
   // 갤러리(여러 URL)
   const [galleryText, setGalleryText] = useState("");
-
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -103,6 +122,20 @@ export default function Page() {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a)}`;
   }, [mapUrl, address]);
 
+  function fillSample() {
+    setName(SAMPLE.name);
+    setAddress(SAMPLE.address);
+    setCategory(SAMPLE.category);
+    setDescription(SAMPLE.description);
+    setThumbnailUrl(SAMPLE.thumbnailUrl);
+    setMapUrl(SAMPLE.mapUrl);
+    setMainMenu(SAMPLE.mainMenu);
+    setFeatures(SAMPLE.features);
+    setPhone(SAMPLE.phone);
+    setGalleryText(SAMPLE.galleryText);
+    setMsg("샘플 데이터를 채웠습니다. (발표용)");
+  }
+
   async function save() {
     if (loading) return;
     setMsg(null);
@@ -128,7 +161,9 @@ export default function Page() {
       }
 
       const murl = mapUrl.trim();
-      const { lat, lng } = murl ? extractLatLng(murl) : { lat: null, lng: null };
+      const { lat, lng } = murl
+        ? extractLatLng(murl)
+        : { lat: null, lng: null };
 
       const gallery_urls = normalizeUrls(galleryText);
       const payload = {
@@ -174,7 +209,8 @@ export default function Page() {
     }
   }
 
-  if (checking) return <div className="text-sm text-gray-500">로그인 확인 중...</div>;
+  if (checking)
+    return <div className="text-sm text-gray-500">로그인 확인 중...</div>;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -189,13 +225,23 @@ export default function Page() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            취소
-          </button>
+          <div className="flex flex-col gap-2">
+  <button
+    type="button"
+    onClick={() => router.push("/")}
+    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+  >
+    취소
+  </button>
+
+  <button
+    type="button"
+    onClick={fillSample}
+    className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+  >
+    샘플 자동 입력
+  </button>
+</div>
         </div>
       </section>
 
@@ -297,7 +343,11 @@ export default function Page() {
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-black/5 bg-white">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={heroPreview} alt="preview" className="h-56 w-full object-cover" />
+            <img
+              src={heroPreview}
+              alt="preview"
+              className="h-56 w-full object-cover"
+            />
           </div>
         </div>
 
@@ -328,7 +378,13 @@ export default function Page() {
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-black/5 bg-white">
             {mapSrc ? (
-              <iframe title="map" src={mapSrc} width="100%" height="260" loading="lazy" />
+              <iframe
+                title="map"
+                src={mapSrc}
+                width="100%"
+                height="260"
+                loading="lazy"
+              />
             ) : (
               <div className="grid h-[260px] place-items-center text-sm text-gray-500">
                 주소/지도 링크를 입력하면 미리보기가 표시됩니다.
@@ -347,7 +403,9 @@ export default function Page() {
         <div className="flex items-center justify-between">
           <div>
             <div className="text-lg font-semibold">갤러리</div>
-            <div className="text-sm text-gray-600">여러 이미지 URL을 줄바꿈/콤마로 입력</div>
+            <div className="text-sm text-gray-600">
+              여러 이미지 URL을 줄바꿈/콤마로 입력
+            </div>
           </div>
           <div className="text-xs text-gray-500">
             {normalizeUrls(galleryText).length} urls
@@ -367,7 +425,10 @@ export default function Page() {
             {normalizeUrls(galleryText)
               .slice(0, 12)
               .map((u) => (
-                <div key={u} className="overflow-hidden rounded-2xl border border-black/5 bg-white">
+                <div
+                  key={u}
+                  className="overflow-hidden rounded-2xl border border-black/5 bg-white"
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={u} alt="g" className="h-24 w-full object-cover" />
                 </div>
@@ -397,7 +458,13 @@ export default function Page() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
       <div className="text-sm font-medium text-gray-800">{label}</div>

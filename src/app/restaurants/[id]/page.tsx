@@ -12,34 +12,25 @@ const FALLBACK_IMG =
   "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1600&q=60";
 
 function mapEmbedUrl(mapUrl?: string | null, address?: string) {
-
   if (mapUrl) {
-
     const m = mapUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
 
     if (m) {
-
       const lat = m[1];
       const lng = m[2];
 
       return `https://www.google.com/maps?q=${lat},${lng}&output=embed`;
-
     }
-
   }
 
   if (address) {
-
     const q = encodeURIComponent(address);
 
     return `https://www.google.com/maps?q=${q}&output=embed`;
-
   }
 
   return "";
-  
 }
-
 
 export default function RestaurantDetailPage() {
   const params = useParams<{ id: string }>();
@@ -51,6 +42,9 @@ export default function RestaurantDetailPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoIdx, setPhotoIdx] = useState(0);
+
   // 리뷰 작성/수정 박스 토글
   const [openEditor, setOpenEditor] = useState(false);
 
@@ -58,12 +52,27 @@ export default function RestaurantDetailPage() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [photoText, setPhotoText] = useState("");
 
   // 저장/삭제 중복 클릭 방지
   const [savingReview, setSavingReview] = useState(false);
 
-  
-  
+  function openPhoto(i: number) {
+    setPhotoIdx(i);
+    setPhotoOpen(true);
+  }
+
+  function closePhoto() {
+    setPhotoOpen(false);
+  }
+
+  function prevPhoto(total: number) {
+    setPhotoIdx((p) => (p - 1 + total) % total);
+  }
+
+  function nextPhoto(total: number) {
+    setPhotoIdx((p) => (p + 1) % total);
+  }
 
   async function refreshAuthOnce() {
     try {
@@ -129,40 +138,54 @@ export default function RestaurantDetailPage() {
   }, [rid]);
 
   const myReview = useMemo(
-    () => (meId ? reviews.find((r) => r.user_id === meId) ?? null : null),
-    [reviews, meId]
+    () => (meId ? (reviews.find((r) => r.user_id === meId) ?? null) : null),
+    [reviews, meId],
   );
 
   useEffect(() => {
     if (myReview) {
       setRating(myReview.rating);
       setComment(myReview.comment);
+      setPhotoText((myReview.photo_urls ?? []).join("\n"));
     } else {
       setRating(5);
       setComment("");
+      setPhotoText("");
     }
   }, [myReview]);
 
   const stats = useMemo(() => {
     if (reviews.length === 0) return { avg: null as number | null, count: 0 };
     const sum = reviews.reduce((a, r) => a + r.rating, 0);
-    return { avg: Math.round((sum / reviews.length) * 10) / 10, count: reviews.length };
+    return {
+      avg: Math.round((sum / reviews.length) * 10) / 10,
+      count: reviews.length,
+    };
   }, [reviews]);
 
   // 내 리뷰를 최상단 고정
   const pinnedAndOthers = useMemo(() => {
     if (!myReview) return { pinned: null as Review | null, others: reviews };
-    return { pinned: myReview, others: reviews.filter((r) => r.id !== myReview.id) };
+    return {
+      pinned: myReview,
+      others: reviews.filter((r) => r.id !== myReview.id),
+    };
   }, [reviews, myReview]);
 
-  // 리뷰어 사진 모아보기: 모든 리뷰의 photo_urls 합치기
-  const reviewPhotos = useMemo(() => {
-    const urls: string[] = [];
-    for (const r of reviews) {
-      (r.photo_urls ?? []).forEach((u) => u && urls.push(u));
-    }
-    return Array.from(new Set(urls)).slice(0, 18);
-  }, [reviews]);
+  const galleryPhotos = useMemo(() => {
+    return (restaurant?.gallery_urls ?? []).filter(Boolean);
+  }, [restaurant]);
+
+  useEffect(() => {
+    if (!photoOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closePhoto();
+      if (e.key === "ArrowLeft") prevPhoto(galleryPhotos.length);
+      if (e.key === "ArrowRight") nextPhoto(galleryPhotos.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [photoOpen, galleryPhotos.length]);
 
   async function upsertMyReview() {
     if (savingReview) return;
@@ -183,7 +206,7 @@ export default function RestaurantDetailPage() {
           rating,
           comment: c,
         },
-        { onConflict: "restaurant_id,user_id" }
+        { onConflict: "restaurant_id,user_id" },
       );
 
       if (error) throw error;
@@ -230,14 +253,17 @@ export default function RestaurantDetailPage() {
     }
   }
 
-  if (loading) return <div className="text-sm text-gray-500">불러오는 중...</div>;
+  if (loading)
+    return <div className="text-sm text-gray-500">불러오는 중...</div>;
 
   if (!restaurant) {
     return (
       <div className="space-y-3">
         <div className="glass rounded-2xl p-5">
           <div className="text-lg font-semibold">맛집을 찾을 수 없습니다.</div>
-          <div className="mt-1 text-sm text-gray-600">홈으로 돌아가 다시 선택해주세요.</div>
+          <div className="mt-1 text-sm text-gray-600">
+            홈으로 돌아가 다시 선택해주세요.
+          </div>
           {msg ? <div className="mt-3 text-sm text-red-600">{msg}</div> : null}
         </div>
         <Link className="text-sm underline" href="/">
@@ -255,7 +281,11 @@ export default function RestaurantDetailPage() {
       <section className="overflow-hidden rounded-3xl border border-black/5 bg-white/80 shadow-[0_12px_40px_rgba(15,23,42,.08)]">
         <div className="relative aspect-[21/9] min-h-[220px] bg-gray-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={heroImg} alt={restaurant.name} className="h-full w-full object-cover" />
+          <img
+            src={heroImg}
+            alt={restaurant.name}
+            className="h-full w-full object-cover"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-6">
             <Link href="/" className="text-xs text-white/80 hover:text-white">
@@ -265,7 +295,9 @@ export default function RestaurantDetailPage() {
               {restaurant.name}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {restaurant.category ? <Badge>{restaurant.category}</Badge> : null}
+              {restaurant.category ? (
+                <Badge>{restaurant.category}</Badge>
+              ) : null}
               <Badge>
                 {stats.avg ? (
                   <span className="inline-flex items-center gap-2">
@@ -289,7 +321,10 @@ export default function RestaurantDetailPage() {
           <div className="text-lg font-semibold">상세 정보</div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <InfoItem label="위치" value={restaurant.address} />
-            <InfoItem label="음식 카테고리" value={restaurant.category ?? "-"} />
+            <InfoItem
+              label="음식 카테고리"
+              value={restaurant.category ?? "-"}
+            />
             <InfoItem label="대표 메뉴" value={restaurant.main_menu ?? "-"} />
             <InfoItem label="특징" value={restaurant.features ?? "-"} />
             <InfoItem label="전화번호" value={restaurant.phone ?? "-"} />
@@ -298,68 +333,67 @@ export default function RestaurantDetailPage() {
         </div>
 
         {/* 지도 */}
-<div className="lg:col-span-5 glass rounded-3xl p-6">
+        <div className="lg:col-span-5 glass rounded-3xl p-6">
+          <div className="flex items-center justify-between">
+            <div className="text-lg font-semibold">지도</div>
 
-  <div className="flex items-center justify-between">
+            <a
+              href={
+                restaurant.map_url ||
+                `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  restaurant.address,
+                )}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Google 지도에서 보기 →
+            </a>
+          </div>
 
-    <div className="text-lg font-semibold">지도</div>
-
-    <a
-      href={
-        restaurant.map_url ||
-        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          restaurant.address
-        )}`
-      }
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-sm text-blue-600 hover:underline"
-    >
-      Google 지도에서 보기 →
-    </a>
-
-  </div>
-
-
-  <div className="mt-3 overflow-hidden rounded-2xl border border-black/5 bg-white">
-
-    <iframe
-      title="map"
-      src={mapEmbedUrl(restaurant.map_url, restaurant.address)}
-      width="100%"
-      height="340"
-      loading="lazy"
-    />
-
-  </div>
-
-</div>
+          <div className="mt-3 overflow-hidden rounded-2xl border border-black/5 bg-white">
+            <iframe
+              title="map"
+              src={mapEmbedUrl(restaurant.map_url, restaurant.address)}
+              width="100%"
+              height="340"
+              loading="lazy"
+            />
+          </div>
+        </div>
       </section>
 
-      {/* 2) 리뷰어들이 올린 사진들 */}
       <section className="glass rounded-3xl p-6">
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-lg font-semibold">리뷰 사진</div>
-            <div className="text-sm text-gray-600">리뷰어들이 올린 사진 모아보기</div>
+            <div className="text-lg font-semibold">매장 사진</div>
+            <div className="text-sm text-gray-600">등록된 매장 추가 사진</div>
           </div>
-          <Badge>{reviewPhotos.length}장</Badge>
+          <Badge>{galleryPhotos.length}장</Badge>
         </div>
 
-        {reviewPhotos.length === 0 ? (
+        {galleryPhotos.length === 0 ? (
           <div className="mt-4 rounded-2xl border border-black/5 bg-white/70 p-4 text-sm text-gray-600">
-            아직 리뷰 사진이 없습니다.
+            추가된 매장 사진이 없습니다.
           </div>
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {reviewPhotos.map((u, idx) => (
-              <div
+            {galleryPhotos.map((u, idx) => (
+              <button
+                type="button"
                 key={`${u}-${idx}`}
-                className="overflow-hidden rounded-2xl border border-black/5 bg-white/70 shadow-sm"
+                onClick={() => openPhoto(idx)}
+                className="group overflow-hidden rounded-2xl border border-black/5 bg-white/70 shadow-sm focus:outline-none"
+                aria-label={`매장 사진 ${idx + 1} 크게 보기`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={u} alt={`review-photo-${idx}`} className="h-28 w-full object-cover" />
-              </div>
+                <img
+                  src={u}
+                  alt={`gallery-${idx}`}
+                  className="h-28 w-full object-cover transition duration-200 group-hover:scale-[1.03]"
+                />
+              </button>
             ))}
           </div>
         )}
@@ -370,7 +404,9 @@ export default function RestaurantDetailPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <div className="text-lg font-semibold">{restaurant.name} 리뷰</div>
+              <div className="text-lg font-semibold">
+                {restaurant.name} 리뷰
+              </div>
               <Badge>{reviews.length}개</Badge>
             </div>
             <div className="text-sm text-gray-600">사용자 한줄평</div>
@@ -386,7 +422,11 @@ export default function RestaurantDetailPage() {
             }}
             className="rounded-2xl bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-900"
           >
-            {meId ? (myReview ? "리뷰 수정" : "리뷰 작성") : "로그인 후 리뷰 작성"}
+            {meId
+              ? myReview
+                ? "리뷰 수정"
+                : "리뷰 작성"
+              : "로그인 후 리뷰 작성"}
           </button>
         </div>
 
@@ -394,7 +434,9 @@ export default function RestaurantDetailPage() {
         {openEditor ? (
           <div className="mt-4 rounded-2xl border border-black/5 bg-white/70 p-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">{myReview ? "내 리뷰 수정" : "내 리뷰 작성"}</div>
+              <div className="text-sm font-medium">
+                {myReview ? "내 리뷰 수정" : "내 리뷰 작성"}
+              </div>
               <button
                 onClick={() => setOpenEditor(false)}
                 className="text-xs text-gray-500 hover:text-gray-700"
@@ -478,10 +520,92 @@ export default function RestaurantDetailPage() {
               아직 리뷰가 없습니다.
             </div>
           ) : (
-            pinnedAndOthers.others.map((r) => <ReviewItem key={r.id} review={r} />)
+            pinnedAndOthers.others.map((r) => (
+              <ReviewItem key={r.id} review={r} />
+            ))
           )}
         </div>
       </section>
+
+      {photoOpen && galleryPhotos.length > 0 ? (
+  <div
+    className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm"
+    onClick={closePhoto}
+    role="dialog"
+    aria-modal="true"
+  >
+    <div
+      className="mx-auto flex h-full max-w-5xl items-center justify-center px-4"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="relative w-full overflow-hidden rounded-3xl bg-white shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+        {/* 상단 바 */}
+        <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
+          <div className="text-sm font-medium">
+            매장 사진 <span className="text-gray-500">{photoIdx + 1} / {galleryPhotos.length}</span>
+          </div>
+          <button
+            type="button"
+            onClick={closePhoto}
+            className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+          >
+            닫기 (ESC)
+          </button>
+        </div>
+
+        {/* 이미지 */}
+        <div className="relative bg-black">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={galleryPhotos[photoIdx]}
+            alt={`gallery-large-${photoIdx}`}
+            className="max-h-[75vh] w-full object-contain"
+          />
+
+          {/* 좌/우 버튼 */}
+          {galleryPhotos.length > 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => prevPhoto(galleryPhotos.length)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 rounded-2xl bg-white/90 px-3 py-2 text-sm shadow hover:bg-white"
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                onClick={() => nextPhoto(galleryPhotos.length)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-2xl bg-white/90 px-3 py-2 text-sm shadow hover:bg-white"
+              >
+                →
+              </button>
+            </>
+          ) : null}
+        </div>
+
+        {/* 하단 썸네일 스트립 (있으면 발표용 더 좋아짐) */}
+        {galleryPhotos.length > 1 ? (
+          <div className="flex gap-2 overflow-x-auto border-t border-black/5 bg-white px-4 py-3">
+            {galleryPhotos.slice(0, 12).map((u, i) => (
+              <button
+                type="button"
+                key={`${u}-${i}`}
+                onClick={() => setPhotoIdx(i)}
+                className={`h-16 w-24 overflow-hidden rounded-xl border ${
+                  i === photoIdx ? "border-black/30" : "border-black/10"
+                }`}
+                aria-label={`썸네일 ${i + 1}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={u} alt={`thumb-${i}`} className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  </div>
+) : null}
     </div>
   );
 }
@@ -490,7 +614,9 @@ function InfoItem({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="rounded-2xl border border-black/5 bg-white/70 p-4 shadow-sm">
       <div className="text-xs text-gray-500">{label}</div>
-      <div className="mt-1 text-sm text-gray-900">{value?.trim() ? value : "-"}</div>
+      <div className="mt-1 text-sm text-gray-900">
+        {value?.trim() ? value : "-"}
+      </div>
     </div>
   );
 }
@@ -505,11 +631,15 @@ function ReviewItem({
   onEdit?: () => void;
 }) {
   return (
-    <div className={`rounded-2xl border bg-white/70 p-4 shadow-sm ${mine ? "border-black/10" : "border-black/5"}`}>
+    <div
+      className={`rounded-2xl border bg-white/70 p-4 shadow-sm ${mine ? "border-black/10" : "border-black/5"}`}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {mine ? (
-            <span className="rounded-full bg-black/5 px-2 py-1 text-xs text-gray-700">내 리뷰</span>
+            <span className="rounded-full bg-black/5 px-2 py-1 text-xs text-gray-700">
+              내 리뷰
+            </span>
           ) : null}
           <RatingStars value={review.rating} />
           <span className="text-sm font-medium">{review.rating}/5</span>
@@ -535,9 +665,16 @@ function ReviewItem({
       {(review.photo_urls?.length ?? 0) > 0 ? (
         <div className="mt-3 grid grid-cols-4 gap-2">
           {review.photo_urls!.slice(0, 8).map((u, idx) => (
-            <div key={`${u}-${idx}`} className="overflow-hidden rounded-xl border border-black/5 bg-white">
+            <div
+              key={`${u}-${idx}`}
+              className="overflow-hidden rounded-xl border border-black/5 bg-white"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={u} alt={`rv-${idx}`} className="h-16 w-full object-cover" />
+              <img
+                src={u}
+                alt={`rv-${idx}`}
+                className="h-16 w-full object-cover"
+              />
             </div>
           ))}
         </div>
